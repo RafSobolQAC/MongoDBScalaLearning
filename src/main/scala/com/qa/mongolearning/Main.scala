@@ -40,27 +40,6 @@ object Main extends App {
     }, 10 seconds)
   }
 
-  //  def getNextSimpleId(name: String) = {
-  //    val doc = Await.result(counter.find().head(), 10 seconds)
-  //    val previousId = doc.get("seq").get.asInt32().getValue
-  //    val filter: Bson = Document("_id" -> name)
-  //    val updated: Document = Document("seq" -> {previousId+1})
-  //
-  //    counter.replaceOne(
-  //      filter,
-  //      updated
-  //    )
-  //      .toFuture()
-  //      .onComplete {
-  //      case Success(value) => println(s"Updated! Now $value")
-  //      case Failure(error) => error.printStackTrace()
-  //    }
-  //
-  //    previousId
-  //
-  //  }
-
-
   def getPersonDocument(person: Person): Document = {
     Document("_id" -> person.id, "firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
   }
@@ -104,7 +83,6 @@ object Main extends App {
 
 
   def getPeople(collection: MongoCollection[Document]): Option[List[Person]] = {
-    //    val doc = Await.result(collection.find().first().head(), 10 seconds)
     val doc = Await.result(collection.find().toFuture(), 10 seconds)
     var returner: Option[List[Person]] = None
     var listToAdd = new ListBuffer[Person]
@@ -148,7 +126,6 @@ object Main extends App {
   }
 
   def makeFilterId(objectId: ObjectId): Bson = {
-
     Document("_id" -> objectId)
   }
 
@@ -157,7 +134,6 @@ object Main extends App {
   }
 
   def updatePerson(collection: MongoCollection[Document], filter: Bson, updatedPerson: Person): Option[Person] = {
-    //    val filter: Bson = Document("_id" -> personId)
     val updated: Document = getPersonDocumentNoId(updatedPerson)
     var returner: Option[Person] = None
     collection.replaceOne(
@@ -208,12 +184,6 @@ object Main extends App {
   }
 
 
-  //        insertPerson(getCollection("person"),getPersonFromInput)
-  //  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
-  //  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
-  //  deleteAll(getCollection("person"))
-  //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
-  //  println(getPeople(getCollection("person")))
   def createReadUpdateDelete(): Any = readLine() match {
     case "create" =>
       insertPerson(getCollection("person"), getPersonFromInput)
@@ -234,6 +204,7 @@ object Main extends App {
       deletePerson(getCollection("person"), makeFilterNoId(getPersonFromInput))
     case "quit" =>
       -1
+    case _ => "Please input a valid choice!"
   }
 
   def runProgram(): Unit = {
