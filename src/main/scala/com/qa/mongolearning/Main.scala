@@ -2,18 +2,17 @@ package com.qa.mongolearning
 
 import org.bson.types._
 import org.mongodb.scala._
-import org.mongodb.scala.bson.{BsonDocument, BsonString}
+import org.mongodb.scala.bson.conversions.Bson
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.Await
-import scala.io.Source
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.language.postfixOps
-import org.mongodb.scala.bson.conversions.Bson
-import org.mongodb.scala.model.Updates._
+import scala.concurrent.{Await, Future}
+import scala.io.Source
 import scala.io.StdIn._
+import scala.language.postfixOps
 import scala.util.{Failure, Success}
+
 object Main extends App {
 
 
@@ -21,35 +20,45 @@ object Main extends App {
     Source.fromResource("userCredentials.txt").getLines().toList.head
   }
 
+  def makeConnection: Future[MongoClient] = Future {
+    MongoClient(getCredentials)
+  }
+
+  //  val mongoClient: MongoClient = Await.result(makeConnection, 10 seconds)
   val mongoClient: MongoClient = MongoClient(getCredentials)
 
-  val database: MongoDatabase = mongoClient.getDatabase("mydb")
-  val collection: MongoCollection[Document] = database.getCollection("person")
 
-//  def getNextSimpleId(name: String) = {
-//    val doc = Await.result(counter.find().head(), 10 seconds)
-//    val previousId = doc.get("seq").get.asInt32().getValue
-//    val filter: Bson = Document("_id" -> name)
-//    val updated: Document = Document("seq" -> {previousId+1})
-//
-//    counter.replaceOne(
-//      filter,
-//      updated
-//    )
-//      .toFuture()
-//      .onComplete {
-//      case Success(value) => println(s"Updated! Now $value")
-//      case Failure(error) => error.printStackTrace()
-//    }
-//
-//    previousId
-//
-//  }
-
+  val database: MongoDatabase = Await.result(Future {
+    mongoClient.getDatabase("mydb")
+  }, 10 seconds)
 
   def getCollection(collectionName: String): MongoCollection[Document] = {
-    database.getCollection(s"$collectionName")
+    Thread.sleep(1000)
+    Await.result(Future {
+      database.getCollection(s"$collectionName")
+    }, 10 seconds)
   }
+
+  //  def getNextSimpleId(name: String) = {
+  //    val doc = Await.result(counter.find().head(), 10 seconds)
+  //    val previousId = doc.get("seq").get.asInt32().getValue
+  //    val filter: Bson = Document("_id" -> name)
+  //    val updated: Document = Document("seq" -> {previousId+1})
+  //
+  //    counter.replaceOne(
+  //      filter,
+  //      updated
+  //    )
+  //      .toFuture()
+  //      .onComplete {
+  //      case Success(value) => println(s"Updated! Now $value")
+  //      case Failure(error) => error.printStackTrace()
+  //    }
+  //
+  //    previousId
+  //
+  //  }
+
 
   def getPersonDocument(person: Person): Document = {
     Document("_id" -> person.id, "firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
@@ -59,7 +68,7 @@ object Main extends App {
     Document("firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
   }
 
-  def insertPerson(collection: MongoCollection[Document], person: Person): Option[Person]= {
+  def insertPerson(collection: MongoCollection[Document], person: Person): Option[Person] = {
     val docPerson = getPersonDocument(person)
     val observable: Observable[Completed] = collection.insertOne(docPerson)
     var returner: Option[Person] = None
@@ -93,9 +102,8 @@ object Main extends App {
   }
 
 
-
   def getPeople(collection: MongoCollection[Document]): Option[List[Person]] = {
-//    val doc = Await.result(collection.find().first().head(), 10 seconds)
+    //    val doc = Await.result(collection.find().first().head(), 10 seconds)
     val doc = Await.result(collection.find().toFuture(), 10 seconds)
     var returner: Option[List[Person]] = None
     var listToAdd = new ListBuffer[Person]
@@ -105,13 +113,21 @@ object Main extends App {
     }
     returner
   }
+  def getPerson(collection: MongoCollection[Document], objectId: ObjectId): Option[Person] = {
+    val doc = Await.result(collection.find(
+      Document("_id" -> objectId)
+    ).toFuture(), 10 seconds)
+    Some(makePersonFromCollectionFind(doc.head)) orElse None
+  }
+
   def makePersonFromCollectionFind(document: Document): Person = {
     Person(getString(document, "firstName"),
       getString(document, "surname"),
       getInt(document, "age"),
-      getObjectId(document, key="_id")
+      getObjectId(document, key = "_id")
     )
   }
+
   def deletePerson(collection: MongoCollection[Document], personId: ObjectId): Option[Person] = {
     val doc = Await.result(collection.find(
       Document("_id" -> personId)
@@ -128,7 +144,9 @@ object Main extends App {
     Await.result(collection.deleteMany(Document()).toFuture(), 10 seconds)
 
   }
+  def updatePersonViaFirstLastAndAge(collection: MongoCollection[Document], person: Person, updatedPerson: Person): Option[Person] = {
 
+  }
   def updatePerson(collection: MongoCollection[Document], personId: ObjectId, updatedPerson: Person): Option[Person] = {
     val filter: Bson = Document("_id" -> personId)
     val updated: Document = getPersonDocumentNoId(updatedPerson)
@@ -171,18 +189,27 @@ object Main extends App {
     }
   }
 
+  def getPersonFromInput: Person = {
+    println("Please input the first name. ")
+    val firstName = stringInput()
+    println("Please input the surname. ")
+    val surname = stringInput()
+    println("Please input the age. ")
+    Person(firstName, surname, intInput())
+  }
 
 
-    //  println(insertPerson(getCollection("person"),Person("Bobby","Tables",12)))
-    //  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
-    //  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
-    //  deleteAll(getCollection("person"))
-    //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
-    //  println(getPeople(getCollection("person")))
-
-
-
-
-
-  println("abc".toInt)
+  //        insertPerson(getCollection("person"),getPersonFromInput)
+  //  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
+  //  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
+  //  deleteAll(getCollection("person"))
+  //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
+  println(getPeople(getCollection("person")))
+  def createReadUpdateDelete(): Unit = readLine() match {
+    case "create" => insertPerson(getCollection("person"),getPersonFromInput)
+    case "read" => getPeople(getCollection("person"))
+    case "update" => updatePerson(getCollection("person"),new ObjectId(stringInput()),getPersonFromInput)
+    case "delete" => deletePerson(getCollection("person"),new ObjectId(stringInput()))
+  }
+  println(getPerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d4")))
 }
