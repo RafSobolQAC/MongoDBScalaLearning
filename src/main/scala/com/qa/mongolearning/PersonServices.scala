@@ -8,37 +8,35 @@ import org.mongodb.scala.bson.conversions.Bson
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
-import scala.io.Source
 import scala.io.StdIn._
+import scala.concurrent.{Await, Future}
 import scala.language.postfixOps
 import scala.util.{Failure, Success}
 import com.qa.mongolearning.Utils._
 
-class PersonServices {
-  val connector = new Connector()
+class PersonServices(testMode: Boolean) {
+  def this() {
+    this(false)
+  }
+  var connector: Connector = _
+  if (!testMode) {
+    connector = getConnector
+  }
+
+  def getConnector: Connector = {
+    new Connector
+  }
+
   val outputParser = new OutputParser(connector)
 
 
-  def insertPerson(collection: MongoCollection[Document], person: Person): Option[Person] = {
+  def insertPerson(collection: MongoCollection[Document], person: Person): Unit = {
     val docPerson = outputParser.getPersonDocument(person)
-    val observable: Observable[Completed] = collection.insertOne(docPerson)
-    var returner: Option[Person] = None
-
-    observable.subscribe(new Observer[Completed] {
-      override def onNext(result: Completed): Unit = println("Inserted")
-
-      override def onError(e: Throwable): Unit = {
-        println("Failed")
-        e.printStackTrace()
-      }
-
-      override def onComplete(): Unit = {
-        println("Completed")
-        returner = Some(person)
-      }
-    })
-    returner
+    collection.insertOne(docPerson).toFuture().onComplete {
+      case Success(_) => giveOutput(Some(person))
+      case Failure(error) => error.printStackTrace()
+        giveOutput(None)
+    }
   }
 
 

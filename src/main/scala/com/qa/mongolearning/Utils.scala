@@ -32,5 +32,8 @@ object Utils {
     println("Please input the age. ")
     Person(firstName, surname, intInput())
   }
+  def giveOutput(output: Any): output.type = {
+    output
+  }
 
 }

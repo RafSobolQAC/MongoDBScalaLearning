@@ -10,17 +10,17 @@ import scala.language.postfixOps
 
 class Connector {
   val mongoClient: MongoClient = makeConnection
+  val database: MongoDatabase = getMongoDB
 
   def getCredentials: String = {
+    println("I'm getting credentials!")
     Source.fromResource("userCredentials.txt").getLines().toList.head
   }
-
   def makeConnection: MongoClient =  {
     MongoClient(getCredentials)
   }
 
-
-  val database: MongoDatabase = Await.result(Future {
+  def getMongoDB: MongoDatabase = Await.result(Future {
     mongoClient.getDatabase("mydb")
   }, 10 seconds)
 
