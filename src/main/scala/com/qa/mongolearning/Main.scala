@@ -153,7 +153,6 @@ object Main extends App {
   }
 
   def makeFilterNoId(person: Person): Bson = {
-    println("New person's details: ")
     Document("firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
   }
 
@@ -216,16 +215,36 @@ object Main extends App {
   //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
   //  println(getPeople(getCollection("person")))
   def createReadUpdateDelete(): Any = readLine() match {
-    case "create" => insertPerson(getCollection("person"), getPersonFromInput)
-    case "read" => getPeople(getCollection("person"))
-    case "update" => updatePerson(getCollection("person"), makeFilterNoId(getPersonFromInput), getPersonFromInput)
-    case "delete" => deletePerson(getCollection("person"), makeFilterNoId(getPersonFromInput))
+    case "create" =>
+      insertPerson(getCollection("person"), getPersonFromInput)
+
+    case "read" =>
+      getPeople(getCollection("person"))
+
+    case "update" =>
+      println("Old details: ")
+      val oldPerson = makeFilterNoId(getPersonFromInput)
+      println("New details: ")
+      val newPerson = getPersonFromInput
+      updatePerson(
+        getCollection("person"),
+        oldPerson,
+        newPerson)
+    case "delete" =>
+      deletePerson(getCollection("person"), makeFilterNoId(getPersonFromInput))
+    case "quit" =>
+      -1
   }
 
   def runProgram(): Unit = {
-    println("create/read/update/delete?")
-    println(createReadUpdateDelete())
-    runProgram()
+    println("create/read/update/delete/quit?")
+    createReadUpdateDelete() match {
+      case -1 => mongoClient.close()
+      case x =>
+        println(x)
+        runProgram()
+    }
+
   }
 
   runProgram()
