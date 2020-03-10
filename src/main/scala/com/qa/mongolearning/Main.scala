@@ -12,7 +12,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import org.mongodb.scala.bson.conversions.Bson
 import org.mongodb.scala.model.Updates._
-
+import scala.io.StdIn._
 import scala.util.{Failure, Success}
 object Main extends App {
 
@@ -52,7 +52,11 @@ object Main extends App {
   }
 
   def getPersonDocument(person: Person): Document = {
-    Document("_id" -> ObjectId.get(), "firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
+    Document("_id" -> person.id, "firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
+  }
+
+  def getPersonDocumentNoId(person: Person): Document = {
+    Document("firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
   }
 
   def insertPerson(collection: MongoCollection[Document], person: Person): Option[Person]= {
@@ -75,34 +79,46 @@ object Main extends App {
     })
     returner
   }
-  def getValueFromKey(entry: Document, key: String): Any = {
-    try {
-      entry.getString(key)
-    } catch {
-//      case e: org.bson.BsonInvalidOperationException => entry.getInteger(key)
-      case e: java.lang.ClassCastException => entry.getInteger(key)
-    }
 
+  def getObjectId(entry: Document, key: String): ObjectId = {
+    entry.getObjectId(key)
   }
+
+  def getString(entry: Document, key: String): String = {
+    entry.getString(key)
+  }
+
+  def getInt(entry: Document, key: String): Int = {
+    entry.getInteger(key)
+  }
+
+
+
   def getPeople(collection: MongoCollection[Document]): Option[List[Person]] = {
 //    val doc = Await.result(collection.find().first().head(), 10 seconds)
     val doc = Await.result(collection.find().toFuture(), 10 seconds)
     var returner: Option[List[Person]] = None
     var listToAdd = new ListBuffer[Person]
     if (doc.nonEmpty) {
-      doc.foreach(el => listToAdd += Person(getValueFromKey(el,"firstName").asInstanceOf[String] ,getValueFromKey(el,"surname").asInstanceOf[String], getValueFromKey(el,"age").asInstanceOf[Int]))
+      doc.foreach(el => listToAdd += makePersonFromCollectionFind(el))
       returner = Some(listToAdd.toList)
     }
     returner
   }
-
+  def makePersonFromCollectionFind(document: Document): Person = {
+    Person(getString(document, "firstName"),
+      getString(document, "surname"),
+      getInt(document, "age"),
+      getObjectId(document, key="_id")
+    )
+  }
   def deletePerson(collection: MongoCollection[Document], personId: ObjectId): Option[Person] = {
     val doc = Await.result(collection.find(
       Document("_id" -> personId)
     ).toFuture(), 10 seconds)
     var returner: Option[Person] = None
     if (doc.nonEmpty) {
-      returner = Some(Person(getValueFromKey(doc.head, "firstName").asInstanceOf[String], getValueFromKey(doc.head, "surname").asInstanceOf[String], getValueFromKey(doc.head, "age").asInstanceOf[Int]))
+      returner = Some(makePersonFromCollectionFind(doc.head))
       Await.result(collection.deleteOne(Document("_id" -> personId)).toFuture(), 10 seconds)
     }
     returner
@@ -115,28 +131,58 @@ object Main extends App {
 
   def updatePerson(collection: MongoCollection[Document], personId: ObjectId, updatedPerson: Person): Option[Person] = {
     val filter: Bson = Document("_id" -> personId)
-    val updated: Document = getPersonDocument(updatedPerson)
+    val updated: Document = getPersonDocumentNoId(updatedPerson)
     var returner: Option[Person] = None
     collection.replaceOne(
       filter,
       updated
     ).toFuture().onComplete {
-      case Success(value) => {
+      case Success(value) =>
         println("Successfully updated.")
+        println(value)
         returner = Some(updatedPerson)
-      }
-      case Failure(error) => {
+      case Failure(error) =>
         println("Failed to update user!")
         error.printStackTrace()
-      }
+
     }
     returner
 
   }
 
-//  println(insertPerson(getCollection("person"),Person("Bobby","Tables",12)))
-//  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
-//  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
-//  deleteAll(getCollection("person"))
-  println(getPeople(getCollection("person")))
+
+  def stringInput(): String = {
+    readLine()
+  }
+
+  @scala.annotation.tailrec
+  def intInput(): Int = {
+    try {
+      readLine().toInt
+    } catch {
+      case e: NumberFormatException =>
+        println("Please input an integer.")
+        intInput()
+
+      case _ =>
+        println("Unknown error - please try again.")
+        intInput()
+
+    }
+  }
+
+
+
+    //  println(insertPerson(getCollection("person"),Person("Bobby","Tables",12)))
+    //  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
+    //  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
+    //  deleteAll(getCollection("person"))
+    //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
+    //  println(getPeople(getCollection("person")))
+
+
+
+
+
+  println("abc".toInt)
 }

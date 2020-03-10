@@ -1,3 +1,5 @@
 package com.qa.mongolearning
 
-case class Person(firstName: String, surname: String, age: Int)
+import org.bson.types.ObjectId
+
+case class Person(firstName: String, surname: String, age: Int, id: ObjectId = ObjectId.get())
