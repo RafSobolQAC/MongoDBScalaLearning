@@ -1,8 +1,8 @@
 package com.qa.mongolearning
 
-import org.bson.types.ObjectId
+import org.bson.types._
 import org.mongodb.scala._
-import org.mongodb.scala.bson.BsonDocument
+import org.mongodb.scala.bson.{BsonDocument, BsonString}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
@@ -10,7 +10,10 @@ import scala.io.Source
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import org.mongodb.scala.bson.conversions.Bson
+import org.mongodb.scala.model.Updates._
 
+import scala.util.{Failure, Success}
 object Main extends App {
 
 
@@ -21,7 +24,28 @@ object Main extends App {
   val mongoClient: MongoClient = MongoClient(getCredentials)
 
   val database: MongoDatabase = mongoClient.getDatabase("mydb")
-  val collection: MongoCollection[Document] = database.getCollection("person");
+  val collection: MongoCollection[Document] = database.getCollection("person")
+
+//  def getNextSimpleId(name: String) = {
+//    val doc = Await.result(counter.find().head(), 10 seconds)
+//    val previousId = doc.get("seq").get.asInt32().getValue
+//    val filter: Bson = Document("_id" -> name)
+//    val updated: Document = Document("seq" -> {previousId+1})
+//
+//    counter.replaceOne(
+//      filter,
+//      updated
+//    )
+//      .toFuture()
+//      .onComplete {
+//      case Success(value) => println(s"Updated! Now $value")
+//      case Failure(error) => error.printStackTrace()
+//    }
+//
+//    previousId
+//
+//  }
+
 
   def getCollection(collectionName: String): MongoCollection[Document] = {
     database.getCollection(s"$collectionName")
@@ -31,9 +55,10 @@ object Main extends App {
     Document("_id" -> ObjectId.get(), "firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
   }
 
-  def insertPerson(collection: MongoCollection[Document], person: Document): Option[Document]= {
-    val observable: Observable[Completed] = collection.insertOne(person)
-    var returner: Option[Document] = None
+  def insertPerson(collection: MongoCollection[Document], person: Person): Option[Person]= {
+    val docPerson = getPersonDocument(person)
+    val observable: Observable[Completed] = collection.insertOne(docPerson)
+    var returner: Option[Person] = None
 
     observable.subscribe(new Observer[Completed] {
       override def onNext(result: Completed): Unit = println("Inserted")
@@ -51,24 +76,67 @@ object Main extends App {
     returner
   }
   def getValueFromKey(entry: Document, key: String): Any = {
-    entry.get(key).get.asString.getValue
+    try {
+      entry.getString(key)
+    } catch {
+//      case e: org.bson.BsonInvalidOperationException => entry.getInteger(key)
+      case e: java.lang.ClassCastException => entry.getInteger(key)
+    }
+
   }
-  def getPeople(collection: MongoCollection[Document]): Option[List[Document]] = {
+  def getPeople(collection: MongoCollection[Document]): Option[List[Person]] = {
 //    val doc = Await.result(collection.find().first().head(), 10 seconds)
     val doc = Await.result(collection.find().toFuture(), 10 seconds)
-    var returner: Option[List[Document]] = None
-    var listToAdd = new ListBuffer[Any]
-    println("Doc is "+doc)
-    println(doc.head)
-    println(doc(0).get("firstName").get.asString().getValue)
+    var returner: Option[List[Person]] = None
+    var listToAdd = new ListBuffer[Person]
     if (doc.nonEmpty) {
       doc.foreach(el => listToAdd += Person(getValueFromKey(el,"firstName").asInstanceOf[String] ,getValueFromKey(el,"surname").asInstanceOf[String], getValueFromKey(el,"age").asInstanceOf[Int]))
-
+      returner = Some(listToAdd.toList)
     }
-    println(listToAdd)
     returner
   }
 
-//  println(insertPerson(getCollection("person"),getPersonDocument(Person("Bobby","Tables",12))))
+  def deletePerson(collection: MongoCollection[Document], personId: ObjectId): Option[Person] = {
+    val doc = Await.result(collection.find(
+      Document("_id" -> personId)
+    ).toFuture(), 10 seconds)
+    var returner: Option[Person] = None
+    if (doc.nonEmpty) {
+      returner = Some(Person(getValueFromKey(doc.head, "firstName").asInstanceOf[String], getValueFromKey(doc.head, "surname").asInstanceOf[String], getValueFromKey(doc.head, "age").asInstanceOf[Int]))
+      Await.result(collection.deleteOne(Document("_id" -> personId)).toFuture(), 10 seconds)
+    }
+    returner
+  }
+
+  def deleteAll(collection: MongoCollection[Document]): Unit = {
+    Await.result(collection.deleteMany(Document()).toFuture(), 10 seconds)
+
+  }
+
+  def updatePerson(collection: MongoCollection[Document], personId: ObjectId, updatedPerson: Person): Option[Person] = {
+    val filter: Bson = Document("_id" -> personId)
+    val updated: Document = getPersonDocument(updatedPerson)
+    var returner: Option[Person] = None
+    collection.replaceOne(
+      filter,
+      updated
+    ).toFuture().onComplete {
+      case Success(value) => {
+        println("Successfully updated.")
+        returner = Some(updatedPerson)
+      }
+      case Failure(error) => {
+        println("Failed to update user!")
+        error.printStackTrace()
+      }
+    }
+    returner
+
+  }
+
+//  println(insertPerson(getCollection("person"),Person("Bobby","Tables",12)))
+//  println(insertPerson(getCollection("person"),Person("Billy","Tables",13)))
+//  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
+//  deleteAll(getCollection("person"))
   println(getPeople(getCollection("person")))
 }
