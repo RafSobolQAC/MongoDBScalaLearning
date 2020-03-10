@@ -2,3 +2,4 @@
 *.iml
 project/target
 target
+src/main/resources/userCredentials.txt
