@@ -1,5 +1,6 @@
 package com.qa.mongolearning
 
+import org.bson.conversions.Bson
 import org.bson.types._
 import org.mongodb.scala._
 import org.mongodb.scala.bson.conversions.Bson
@@ -113,6 +114,7 @@ object Main extends App {
     }
     returner
   }
+
   def getPerson(collection: MongoCollection[Document], objectId: ObjectId): Option[Person] = {
     val doc = Await.result(collection.find(
       Document("_id" -> objectId)
@@ -128,14 +130,14 @@ object Main extends App {
     )
   }
 
-  def deletePerson(collection: MongoCollection[Document], personId: ObjectId): Option[Person] = {
+  def deletePerson(collection: MongoCollection[Document], filter: Bson): Option[Person] = {
     val doc = Await.result(collection.find(
-      Document("_id" -> personId)
+      filter
     ).toFuture(), 10 seconds)
     var returner: Option[Person] = None
     if (doc.nonEmpty) {
       returner = Some(makePersonFromCollectionFind(doc.head))
-      Await.result(collection.deleteOne(Document("_id" -> personId)).toFuture(), 10 seconds)
+      Await.result(collection.deleteOne(filter).toFuture(), 10 seconds)
     }
     returner
   }
@@ -144,11 +146,19 @@ object Main extends App {
     Await.result(collection.deleteMany(Document()).toFuture(), 10 seconds)
 
   }
-  def updatePersonViaFirstLastAndAge(collection: MongoCollection[Document], person: Person, updatedPerson: Person): Option[Person] = {
 
+  def makeFilterId(objectId: ObjectId): Bson = {
+
+    Document("_id" -> objectId)
   }
-  def updatePerson(collection: MongoCollection[Document], personId: ObjectId, updatedPerson: Person): Option[Person] = {
-    val filter: Bson = Document("_id" -> personId)
+
+  def makeFilterNoId(person: Person): Bson = {
+    println("New person's details: ")
+    Document("firstName" -> person.firstName, "surname" -> person.surname, "age" -> person.age)
+  }
+
+  def updatePerson(collection: MongoCollection[Document], filter: Bson, updatedPerson: Person): Option[Person] = {
+    //    val filter: Bson = Document("_id" -> personId)
     val updated: Document = getPersonDocumentNoId(updatedPerson)
     var returner: Option[Person] = None
     collection.replaceOne(
@@ -204,12 +214,19 @@ object Main extends App {
   //  println(insertPerson(getCollection("person"),Person("Bartholomew","Tables",14)))
   //  deleteAll(getCollection("person"))
   //  updatePerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d3"),Person("Robert","Tables",40))
-  println(getPeople(getCollection("person")))
-  def createReadUpdateDelete(): Unit = readLine() match {
-    case "create" => insertPerson(getCollection("person"),getPersonFromInput)
+  //  println(getPeople(getCollection("person")))
+  def createReadUpdateDelete(): Any = readLine() match {
+    case "create" => insertPerson(getCollection("person"), getPersonFromInput)
     case "read" => getPeople(getCollection("person"))
-    case "update" => updatePerson(getCollection("person"),new ObjectId(stringInput()),getPersonFromInput)
-    case "delete" => deletePerson(getCollection("person"),new ObjectId(stringInput()))
+    case "update" => updatePerson(getCollection("person"), makeFilterNoId(getPersonFromInput), getPersonFromInput)
+    case "delete" => deletePerson(getCollection("person"), makeFilterNoId(getPersonFromInput))
   }
-  println(getPerson(getCollection("person"),new ObjectId("5e67878c6ee1165b7670d2d4")))
+
+  def runProgram(): Unit = {
+    println("create/read/update/delete?")
+    println(createReadUpdateDelete())
+    runProgram()
+  }
+
+  runProgram()
 }
